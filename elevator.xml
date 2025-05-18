@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.6//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_6.dtd'>
+<nta>
+	<declaration>// Place global declarations here.
+const int N_F = 6;          // 6 Floors
+const int N_E = 2;          // 2 Elevators
+
+const int N = N_F + 1;
+typedef int[1,N-1] id_t;
+int[1,2] turn;
+
+
+chan request_up[N],request_down[N],ack[N];</declaration>
+	<template>
+		<name x="5" y="5">Elevator</name>
+		<parameter>const int[1,2] cel</parameter>
+		<declaration>// Place local declarations here.
+clock timeE;
+int requestQueue[N];
+int curr_floor;
+int dest_floor;
+int ackList[N];
+int[0,N-1] len;
+int[0,N-1] len2;
+bool GoingUp = 0;
+bool GoingDown = 0;
+
+// Used in functions
+int i = 0;
+int j = 0;
+int temp;
+int floorN;
+
+// Put an element at the end of the queue 
+// and sort the queue in ascending order
+void enqueueA(id_t element) {
+    ackList[len2++] = element;
+    floorN = element;
+    requestQueue[len++] = floorN;
+    GoingUp = 1;
+    for (i = 0; i &lt; len; i++) {
+        for (j = i+1; j &lt; len; j++) {
+            if ((requestQueue[i] &gt; requestQueue[j]) &amp;&amp; (j &gt; i)) {
+                temp = ackList[i];
+                requestQueue[i] = requestQueue[j];
+                requestQueue[j] = temp;
+            }
+        }
+    }
+}
+
+// Put an element at the end of the queue 
+// and sort the queue in descending order
+void enqueueD(id_t element) {
+    ackList[len2++] = element;
+    floorN = element;
+    requestQueue[len++] = floorN;
+    GoingDown = 1;
+    for (i = 0; i &lt; len; i++) {
+        for (j = i+1; j &lt; len; j++) {
+            if ((requestQueue[i] &lt; requestQueue[j]) &amp;&amp; (j &gt; i)) {
+                temp = requestQueue[i];
+                requestQueue[i] = requestQueue[j];
+                requestQueue[j] = temp;
+            }
+        }
+    }
+}
+
+// Remove the front element of the queue
+void dequeue() {
+    for (i = 0; i &lt; N-1; i++) {
+        requestQueue[i] = requestQueue[i+1];
+    }
+    len--;
+}
+
+// Remove the front element of the Acknowledgement queue
+void dequeueAck() {
+    for (i = 0; i &lt; N-1; i++) {
+        ackList[i] = ackList[i+1];
+    }
+    len2--;
+    GoingUp = 0;
+    GoingDown = 0;
+}
+
+// Returns the front element of the queue
+id_t front() {
+   return ackList[0];
+}</declaration>
+		<location id="id0" x="-289" y="-93">
+			<name x="-314" y="-136">Idle</name>
+		</location>
+		<location id="id1" x="204" y="-93">
+			<name x="119" y="-119">MovingUp</name>
+			<label kind="invariant" x="212" y="-119">timeE &lt;= 60</label>
+		</location>
+		<location id="id2" x="221" y="280">
+			<name x="204" y="306">Loading_Unloading</name>
+			<committed/>
+		</location>
+		<location id="id3" x="-289" y="280">
+			<name x="-381" y="297">MovingDown</name>
+			<label kind="invariant" x="-399" y="280">timeE &lt;= 60</label>
+		</location>
+		<location id="id4" x="-51" y="93">
+			<committed/>
+		</location>
+		<init ref="id0"/>
+		<transition id="id5">
+			<source ref="id4"/>
+			<target ref="id4"/>
+			<label kind="guard" x="-263" y="76">ackList[0] &gt; 0</label>
+			<label kind="synchronisation" x="-263" y="93">ack[front()]!</label>
+			<label kind="assignment" x="-263" y="110">dequeueAck()</label>
+			<nail x="-136" y="127"/>
+			<nail x="-136" y="76"/>
+		</transition>
+		<transition id="id6">
+			<source ref="id4"/>
+			<target ref="id0"/>
+			<label kind="guard" x="-161" y="-8">len2 == 0</label>
+		</transition>
+		<transition id="id7">
+			<source ref="id2"/>
+			<target ref="id4"/>
+			<label kind="guard" x="0" y="119">len == 0</label>
+			<label kind="synchronisation" x="0" y="136">ack[front()]!</label>
+			<label kind="assignment" x="0" y="153">dequeueAck()</label>
+		</transition>
+		<transition id="id8">
+			<source ref="id2"/>
+			<target ref="id3"/>
+			<label kind="guard" x="-144" y="306">requestQueue[0] &gt; 0 &amp;&amp;
+GoingDown == 1</label>
+			<nail x="119" y="323"/>
+			<nail x="-170" y="323"/>
+		</transition>
+		<transition id="id9">
+			<source ref="id2"/>
+			<target ref="id1"/>
+			<label kind="guard" x="272" y="76">requestQueue[0] &gt; 0 &amp;&amp;
+GoingUp == 1</label>
+			<label kind="assignment" x="272" y="119">dest_floor := requestQueue[0]</label>
+			<nail x="263" y="204"/>
+			<nail x="263" y="-17"/>
+		</transition>
+		<transition id="id10">
+			<source ref="id3"/>
+			<target ref="id3"/>
+			<label kind="select" x="-722" y="238">floorNumber : id_t</label>
+			<label kind="guard" x="-722" y="255">floorNumber &lt;= curr_floor &amp;&amp;
+turn == cel &amp;&amp; timeE &lt; 60</label>
+			<label kind="synchronisation" x="-722" y="357">request_down[floorNumber]?</label>
+			<label kind="assignment" x="-722" y="297">enqueueD(floorNumber),
+dest_floor := requestQueue[0],
+turn := (cel==1?2:1)</label>
+			<nail x="-289" y="374"/>
+			<nail x="-450" y="374"/>
+			<nail x="-450" y="280"/>
+		</transition>
+		<transition id="id11">
+			<source ref="id1"/>
+			<target ref="id1"/>
+			<label kind="select" x="323" y="-178">floorNumber : id_t</label>
+			<label kind="guard" x="323" y="-161">floorNumber &gt;= curr_floor &amp;&amp;
+turn == cel &amp;&amp; timeE &lt; 60</label>
+			<label kind="synchronisation" x="323" y="-59">request_up[floorNumber]?</label>
+			<label kind="assignment" x="323" y="-119">enqueueA(floorNumber),
+dest_floor := requestQueue[0],
+turn := (cel==1?2:1)</label>
+			<nail x="204" y="-178"/>
+			<nail x="314" y="-178"/>
+			<nail x="314" y="-93"/>
+		</transition>
+		<transition id="id12">
+			<source ref="id3"/>
+			<target ref="id2"/>
+			<label kind="assignment" x="-153" y="229">curr_floor = dest_floor,
+dequeue()</label>
+			<nail x="-170" y="229"/>
+			<nail x="110" y="229"/>
+		</transition>
+		<transition id="id13">
+			<source ref="id1"/>
+			<target ref="id2"/>
+			<label kind="assignment" x="17" y="8">curr_floor = dest_floor,
+dequeue()</label>
+			<nail x="161" y="-17"/>
+			<nail x="161" y="195"/>
+		</transition>
+		<transition id="id14">
+			<source ref="id0"/>
+			<target ref="id3"/>
+			<label kind="select" x="-544" y="8">floorNumber : id_t</label>
+			<label kind="guard" x="-544" y="25">turn == cel</label>
+			<label kind="synchronisation" x="-544" y="42">request_down[floorNumber]?</label>
+			<label kind="assignment" x="-544" y="59">timeE:=0,
+enqueueD(floorNumber),
+dest_floor := floorNumber,
+turn := (cel==1?2:1)</label>
+		</transition>
+		<transition id="id15">
+			<source ref="id0"/>
+			<target ref="id1"/>
+			<label kind="select" x="-178" y="-204">floorNumber : id_t</label>
+			<label kind="guard" x="-178" y="-187">turn == cel</label>
+			<label kind="synchronisation" x="-178" y="-170">request_up[floorNumber]?</label>
+			<label kind="assignment" x="-178" y="-153">timeE := 0,
+enqueueA(floorNumber),
+dest_floor := floorNumber,
+turn := (cel==1?2:1)</label>
+		</transition>
+	</template>
+	<template>
+		<name>Floor</name>
+		<parameter>const int[1,6] floorNumber</parameter>
+		<declaration>clock timeF;</declaration>
+		<location id="id16" x="-119" y="-42">
+			<name x="-136" y="-85">Idle</name>
+		</location>
+		<location id="id17" x="-416" y="-34">
+			<name x="-535" y="-42">DownRequest</name>
+			<label kind="invariant" x="-501" y="-17">timeF &lt;= 60</label>
+		</location>
+		<location id="id18" x="221" y="-34">
+			<name x="246" y="-42">UpRequest</name>
+			<label kind="invariant" x="229" y="-17">timeF &lt;= 60</label>
+		</location>
+		<init ref="id16"/>
+		<transition id="id19">
+			<source ref="id17"/>
+			<target ref="id16"/>
+			<label kind="synchronisation" x="-340" y="42">ack[floorNumber]?</label>
+			<nail x="-331" y="34"/>
+			<nail x="-195" y="34"/>
+		</transition>
+		<transition id="id20">
+			<source ref="id16"/>
+			<target ref="id17"/>
+			<label kind="guard" x="-331" y="-102">floorNumber &gt; 1</label>
+			<label kind="synchronisation" x="-374" y="-136">request_down[floorNumber]!</label>
+			<label kind="assignment" x="-306" y="-85">timeF := 0</label>
+			<nail x="-204" y="-110"/>
+			<nail x="-331" y="-110"/>
+		</transition>
+		<transition id="id21">
+			<source ref="id18"/>
+			<target ref="id16"/>
+			<label kind="synchronisation" x="-25" y="42">ack[floorNumber]?</label>
+			<nail x="127" y="34"/>
+			<nail x="-25" y="34"/>
+		</transition>
+		<transition id="id22">
+			<source ref="id16"/>
+			<target ref="id18"/>
+			<label kind="guard" x="-25" y="-102">floorNumber &lt; N-1</label>
+			<label kind="synchronisation" x="-51" y="-136">request_up[floorNumber]!</label>
+			<label kind="assignment" x="8" y="-85">timeF := 0</label>
+			<nail x="-17" y="-110"/>
+			<nail x="119" y="-110"/>
+		</transition>
+	</template>
+	<system>// Place template instantiations here.
+
+// List one or more processes to be composed into a system.
+
+
+system Elevator, Floor;</system>
+	<queries>
+		<option key="--diagnostic" value="0"/>
+		<query>
+			<formula>A[] not deadlock</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-01-02 11:36:33 +0100">
+				<option key="--diagnostic" value="-1"/>
+			</result>
+		</query>
+		<query>
+			<formula>Floor(1).UpRequest--&gt; Floor(1).Idle</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-01-04 14:25:00 +0100">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>Floor(3).DownRequest--&gt; Floor(3).Idle</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-01-04 14:27:30 +0100">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>Elevator(1).MovingUp--&gt; Elevator(1).Loading_Unloading</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-01-04 14:29:51 +0100">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>Elevator(2).MovingUp--&gt; Elevator(2).Loading_Unloading</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-01-04 14:32:24 +0100">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>E&lt;&gt; Elevator(1).Loading_Unloading&amp;&amp; Elevator(1).curr_floor== 4</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-01-04 14:32:38 +0100">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+	</queries>
+</nta>
